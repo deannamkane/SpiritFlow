@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { MoonIcon } from '../components/icons';
 import Card from '../components/Card';
 import AudioPlayer from '../components/AudioPlayer';
-import ReflectionPrompts from '../components/ReflectionPrompts';
+import EveningReflection from '../components/EveningReflection';
 import QuoteCard from '../components/QuoteCard';
 import StarRating from '../components/StarRating';
 import ProgressBar from '../components/ProgressBar';
@@ -10,11 +10,25 @@ import type { Goal } from '../App';
 
 interface RestFlowProps {
     morningAffirmation: string;
+    morningEnergy: string;
+    morningEmotion: string;
     goals: Goal[];
     onToggleGoal: (index: number) => void;
+    restQuote: { quote: string; author: string };
+    setEveningVictory: (victory: string) => void;
+    setEveningRelease: (release: string) => void;
 }
 
-const RestFlow: React.FC<RestFlowProps> = ({ morningAffirmation, goals, onToggleGoal }) => {
+const RestFlow: React.FC<RestFlowProps> = ({ 
+    morningAffirmation, 
+    morningEnergy, 
+    morningEmotion, 
+    goals, 
+    onToggleGoal, 
+    restQuote,
+    setEveningVictory,
+    setEveningRelease 
+}) => {
     const [isCompleted, setIsCompleted] = useState(false);
 
     const handleComplete = () => {
@@ -56,28 +70,38 @@ const RestFlow: React.FC<RestFlowProps> = ({ morningAffirmation, goals, onToggle
                             textColor="text-moonlight-silver"
                         />
                     </Card>
-                    <ReflectionPrompts
-                        prompts={[
-                            "What small victory can I honor?",
-                            "What can I release before rest?"
-                        ]}
-                        textColor="text-moonlight-silver"
-                        placeholderColor="placeholder-moonlight-silver/50"
-                        bgColor="bg-translucent-lavender"
+                    <EveningReflection
+                        setEveningVictory={setEveningVictory}
+                        setEveningRelease={setEveningRelease}
                     />
                     <QuoteCard
-                        quote="Finish each day and be done with it."
-                        author="Ralph Waldo Emerson"
+                        quote={restQuote.quote}
+                        author={restQuote.author}
                         textColor="text-moonlight-silver"
                     />
                 </div>
                 <div className="space-y-8 sm:space-y-12">
+                    <Card className="text-moonlight-silver">
+                        <h3 className="text-xl font-bold text-center mb-4">Morning Intentions Recap</h3>
+                        <div className="space-y-3 text-left">
+                            <div>
+                                <p className="font-semibold opacity-80">You placed your energy on:</p>
+                                <p className="italic pl-2">{morningEnergy || "No intention set."}</p>
+                            </div>
+                            <div>
+                                <p className="font-semibold opacity-80">You invited in the emotion of:</p>
+                                <p className="italic pl-2">{morningEmotion || "No intention set."}</p>
+                            </div>
+                        </div>
+                    </Card>
+
                     <Card className="text-moonlight-silver">
                         <h3 className="text-xl font-bold mb-2 text-center">Morning Affirmation Recap</h3>
                         <p className="text-center italic text-lg mb-4">"{morningAffirmation}"</p>
                         <p className="text-center mb-4 opacity-80">Did this feel true today?</p>
                         <StarRating />
                     </Card>
+
                     <Card className="text-moonlight-silver flex flex-col items-center">
                         <h3 className="text-xl font-bold mb-4">Goal Progress</h3>
                         <ProgressBar progress={progressPercentage} />

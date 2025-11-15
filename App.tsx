@@ -3,6 +3,7 @@ import RiseFlow from './flows/RiseFlow';
 import RestFlow from './flows/RestFlow';
 import ProgressView from './views/ProgressView';
 import { SunIcon, MoonIcon } from './components/icons';
+import { dailyContent } from './data/dailyContent';
 
 type Flow = 'rise' | 'rest';
 type View = 'flow' | 'progress';
@@ -18,6 +19,18 @@ const App: React.FC = () => {
   const [morningAffirmation, setMorningAffirmation] = useState<string>("I am focused, calm, and ready to receive.");
   const [goals, setGoals] = useState<Goal[]>([]);
   const [streak, setStreak] = useState(3); // Example streak
+  
+  // State for morning reflections
+  const [morningEnergy, setMorningEnergy] = useState('');
+  const [morningEmotion, setMorningEmotion] = useState('');
+
+  // State for evening reflections
+  const [eveningVictory, setEveningVictory] = useState('');
+  const [eveningRelease, setEveningRelease] = useState('');
+
+  // Get content for the current day of the week
+  const dayIndex = new Date().getDay(); // Sunday = 0, Monday = 1, etc.
+  const todayContent = dailyContent[dayIndex];
   
   useEffect(() => {
     const hour = new Date().getHours();
@@ -83,13 +96,21 @@ const App: React.FC = () => {
               setMorningAffirmation={setMorningAffirmation}
               goals={goals}
               setGoals={setGoals}
+              setMorningEnergy={setMorningEnergy}
+              setMorningEmotion={setMorningEmotion}
+              riseQuote={todayContent.riseQuote}
               onShowProgress={() => setCurrentView('progress')}
             />
           ) : (
             <RestFlow 
               morningAffirmation={morningAffirmation} 
+              morningEnergy={morningEnergy}
+              morningEmotion={morningEmotion}
               goals={goals}
               onToggleGoal={handleToggleGoal}
+              restQuote={todayContent.restQuote}
+              setEveningVictory={setEveningVictory}
+              setEveningRelease={setEveningRelease}
             />
           )
         ) : (

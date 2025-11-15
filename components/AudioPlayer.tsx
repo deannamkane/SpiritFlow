@@ -1,4 +1,4 @@
-import React, { useState, useRef } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import { PlayIcon, PauseIcon, SpinnerIcon } from './icons';
 import { GoogleGenAI, Modality } from "@google/genai";
 
@@ -43,10 +43,13 @@ interface AudioPlayerProps {
   textColor: string;
 }
 
-const WaveformBar: React.FC<{ height: number; color: string; delay: number }> = ({ height, color, delay }) => (
+const WaveformBar: React.FC<{ height: number; color: string; delay: number; isPlaying: boolean }> = ({ height, color, delay, isPlaying }) => (
   <div
-    className={`w-1 rounded-full ${color}`}
-    style={{ height: `${height}px`, animation: `wave 1.5s ease-in-out infinite`, animationDelay: `${delay}s` }}
+    className={`w-1 rounded-full ${color} transition-transform duration-500`}
+    style={{ 
+      height: `${height}px`, 
+      animation: isPlaying ? `wave 1.5s ease-in-out infinite ${delay}s` : 'none'
+    }}
   >
     <style>{`
       @keyframes wave {
@@ -67,84 +70,113 @@ const AudioPlayer: React.FC<AudioPlayerProps> = ({ title, prompt, duration, wave
 
   const heights = [20, 30, 25, 35, 22, 28, 32, 26, 20, 30, 25, 35, 22, 28, 32, 26, 20, 30, 25, 35, 22, 28, 32, 26];
   
-  const playAudio = (buffer: AudioBuffer) => {
-    if (!audioContextRef.current) return;
-    // Stop any existing source
+  const stopAudio = () => {
     if (sourceRef.current) {
-        sourceRef.current.stop();
+        sourceRef.current.onended = null; // Important to prevent recursive call
+        try {
+          sourceRef.current.stop();
+        } catch(e) { console.warn("Audio source already stopped:", e); }
+        sourceRef.current = null;
     }
+    setIsPlaying(false);
+  };
+  
+  const playAudio = async () => {
+    if (!audioContextRef.current || !audioBufferRef.current) return;
+    if (audioContextRef.current.state === 'suspended') {
+      await audioContextRef.current.resume();
+    }
+    
+    // Stop any existing audio before playing new one
+    stopAudio();
 
     const source = audioContextRef.current.createBufferSource();
-    source.buffer = buffer;
+    source.buffer = audioBufferRef.current;
     source.connect(audioContextRef.current.destination);
-    source.start();
+    
     source.onended = () => {
+      // Check if this source is still the current one before setting state
+      if (sourceRef.current === source) {
         setIsPlaying(false);
         sourceRef.current = null;
+      }
     };
+    
+    source.start(0);
     sourceRef.current = source;
     setIsPlaying(true);
   };
 
-
-  const handlePlayPause = async () => {
+  const handleTogglePlay = async () => {
     if (isLoading) return;
     
-    // Initialize AudioContext on first interaction
+    // Initialize AudioContext on first user gesture.
     if (!audioContextRef.current) {
+      try {
         audioContextRef.current = new (window.AudioContext || (window as any).webkitAudioContext)({ sampleRate: 24000 });
+      } catch (e) {
+        console.error("AudioContext could not be created:", e);
+        alert("Your browser does not support the necessary audio features.");
+        return;
+      }
     }
-
+    
     if (isPlaying) {
-        audioContextRef.current.suspend();
-        setIsPlaying(false);
+      stopAudio();
     } else {
-        if (audioContextRef.current.state === 'suspended') {
-            audioContextRef.current.resume();
-            setIsPlaying(true);
-            return;
-        }
+      if (audioBufferRef.current) {
+        playAudio();
+      } else {
+        setIsLoading(true);
+        try {
+          const ai = new GoogleGenAI({apiKey: process.env.API_KEY as string});
+          const response = await ai.models.generateContent({
+            model: "gemini-2.5-flash-preview-tts",
+            contents: [{ parts: [{ text: `Say with a calm, gentle, and reassuring voice: ${prompt}` }] }],
+            config: {
+              responseModalities: [Modality.AUDIO],
+              speechConfig: {
+                voiceConfig: {
+                  prebuiltVoiceConfig: { voiceName: 'Kore' },
+                },
+              },
+            },
+          });
 
-        if (audioBufferRef.current) {
-            playAudio(audioBufferRef.current);
-        } else {
-            setIsLoading(true);
-            try {
-                const ai = new GoogleGenAI({apiKey: process.env.API_KEY as string});
-                const response = await ai.models.generateContent({
-                  model: "gemini-2.5-flash-preview-tts",
-                  contents: [{ parts: [{ text: `Say with a calm, gentle, and reassuring voice: ${prompt}` }] }],
-                  config: {
-                    responseModalities: [Modality.AUDIO],
-                    speechConfig: {
-                        voiceConfig: {
-                          prebuiltVoiceConfig: { voiceName: 'Kore' },
-                        },
-                    },
-                  },
-                });
-
-                const base64Audio = response.candidates?.[0]?.content?.parts?.[0]?.inlineData?.data;
-                if (base64Audio) {
-                    const audioBytes = decode(base64Audio);
-                    const audioBuffer = await decodeAudioData(audioBytes, audioContextRef.current, 24000, 1);
-                    audioBufferRef.current = audioBuffer;
-                    playAudio(audioBuffer);
-                }
-            } catch (error) {
-                console.error("Failed to generate audio:", error);
-                alert("Sorry, there was an error generating the audio. Please try again.");
-            } finally {
-                setIsLoading(false);
-            }
+          const base64Audio = response.candidates?.[0]?.content?.parts?.[0]?.inlineData?.data;
+          if (base64Audio && audioContextRef.current) {
+            const audioBytes = decode(base64Audio);
+            const audioBuffer = await decodeAudioData(audioBytes, audioContextRef.current, 24000, 1);
+            audioBufferRef.current = audioBuffer;
+            playAudio();
+          } else {
+             throw new Error("No audio data received from API.");
+          }
+        } catch (error) {
+          console.error("Failed to generate audio:", error);
+          alert("Sorry, there was an error generating the audio. Please try again.");
+        } finally {
+          setIsLoading(false);
         }
+      }
     }
   };
+  
+  // Cleanup on unmount
+  useEffect(() => {
+    return () => {
+      stopAudio();
+      if (audioContextRef.current && audioContextRef.current.state !== 'closed') {
+        audioContextRef.current.close();
+      }
+    };
+  }, []);
+
 
   return (
     <div className={`flex items-center space-x-4 ${textColor}`}>
       <button
-        onClick={handlePlayPause}
+        onClick={handleTogglePlay}
         disabled={isLoading}
         className={`w-14 h-14 flex-shrink-0 rounded-full flex items-center justify-center shadow-lg transition-all duration-300 active:scale-95 active:shadow-inner disabled:opacity-50 disabled:cursor-not-allowed ${buttonColor}`}
       >
@@ -157,7 +189,7 @@ const AudioPlayer: React.FC<AudioPlayerProps> = ({ title, prompt, duration, wave
         <div className="flex items-center space-x-3 mt-2">
           <div className="flex items-end space-x-1 h-10">
             {heights.map((h, i) => (
-              <WaveformBar key={i} height={h} color={waveformColor} delay={i * 0.1} />
+              <WaveformBar key={i} height={h} color={waveformColor} delay={i * 0.1} isPlaying={isPlaying} />
             ))}
           </div>
         </div>

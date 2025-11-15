@@ -2,11 +2,11 @@ import React, { useState } from 'react';
 import { GalaxyIcon } from '../components/icons';
 import Card from '../components/Card';
 import AudioPlayer from '../components/AudioPlayer';
-import ReflectionPrompts from '../components/ReflectionPrompts';
 import QuoteCard from '../components/QuoteCard';
 import AffirmationCarousel from '../components/AffirmationCarousel';
 import BreathingCircle from '../components/BreathingCircle';
 import GoalSetter from '../components/GoalSetter';
+import IntentionSetter from '../components/IntentionSetter';
 import type { Goal } from '../App';
 
 interface RiseFlowProps {
@@ -14,10 +14,22 @@ interface RiseFlowProps {
     setMorningAffirmation: (affirmation: string) => void;
     goals: Goal[];
     setGoals: React.Dispatch<React.SetStateAction<Goal[]>>;
+    setMorningEnergy: (energy: string) => void;
+    setMorningEmotion: (emotion: string) => void;
+    riseQuote: { quote: string; author: string };
     onShowProgress: () => void;
 }
 
-const RiseFlow: React.FC<RiseFlowProps> = ({ morningAffirmation, setMorningAffirmation, goals, setGoals, onShowProgress }) => {
+const RiseFlow: React.FC<RiseFlowProps> = ({ 
+    morningAffirmation, 
+    setMorningAffirmation, 
+    goals, 
+    setGoals, 
+    setMorningEnergy,
+    setMorningEmotion,
+    riseQuote,
+    onShowProgress 
+}) => {
     const [isCompleted, setIsCompleted] = useState(false);
 
     const handleComplete = () => {
@@ -56,19 +68,14 @@ const RiseFlow: React.FC<RiseFlowProps> = ({ morningAffirmation, setMorningAffir
                         />
                     </Card>
 
-                    <ReflectionPrompts
-                        prompts={[
-                            "Where will I place my energy today?",
-                            "What emotion will I invite in?"
-                        ]}
-                        textColor="text-slate-800"
-                        placeholderColor="placeholder-slate-500"
-                        bgColor="bg-soft-pink"
+                    <IntentionSetter
+                        setMorningEnergy={setMorningEnergy}
+                        setMorningEmotion={setMorningEmotion}
                     />
 
                     <QuoteCard
-                        quote="Where attention goes, energy flows."
-                        author="James Redfield"
+                        quote={riseQuote.quote}
+                        author={riseQuote.author}
                         textColor="text-slate-800"
                     />
                 </div>
